@@ -7,7 +7,7 @@ from watchdog.events import PatternMatchingEventHandler
 import time
 
 
-def send_file(filename, server):
+def send_file(server: socket.socket, filename: str):
     def handshake():
         # Notify the server that a file is sending
         server.send("Sending File...".encode())
@@ -57,23 +57,8 @@ def send_file(filename, server):
     print(server.recv(4096).decode().strip())
 
 
-def on_created(event):
-    pass
-
-
 def main():
-    # Watchdog initialization code
-    patterns = ["*"]
-    ignore_patterns = None
-    ignore_directories = None
-    case_sensitive = True
-    my_event_handler = PatternMatchingEventHandler(patterns, ignore_patterns, ignore_directories, case_sensitive)
-    my_event_handler.on_created = on_created
-    path = "Camera\\Images"
-    go_recursively = True
-    my_observer = Observer()
-    my_observer.schedule(my_event_handler, path, recursive=go_recursively)
-    print("im here")
+
 
     # define server location (localhost)
     host = "127.0.0.1"
@@ -83,6 +68,30 @@ def main():
 
     # connect to Server
     s.connect((host, port))
+
+    # Watchdog initialization code
+    def on_created(event):
+        print(f"New file {event.src_path}")
+        send_file(s, event.src_path)
+    def on_deleted(event):
+        print(f'File {event.src_path} deleted')
+
+    patterns = ["*"]
+    ignore_patterns = None
+    ignore_directories = None
+    case_sensitive = True
+    my_event_handler = PatternMatchingEventHandler(patterns, ignore_patterns, ignore_directories, case_sensitive)
+    my_event_handler.on_created = on_created
+    my_event_handler.on_deleted = on_deleted
+    path = os.getcwd() + "\\Camera\\Images"
+    print(path)
+    go_recursively = True
+    my_observer = Observer()
+    my_observer.schedule(my_event_handler, path, recursive=go_recursively)
+    my_observer.start()
+    print("im here")
+    while True:
+        pass
 
 
 
