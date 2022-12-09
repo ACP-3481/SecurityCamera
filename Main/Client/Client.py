@@ -8,19 +8,6 @@ import time
 
 
 def send_file(server: socket.socket, filename: str):
-    def handshake():
-        # Notify the server that a file is sending
-        server.send("Sending File...".encode())
-        # Receive Server Acknowledgment
-        if not server.recv(48).decode() == "Receiving File.":
-            print("Server Acknowledgement Failed")
-            return "Server Acknowledgment Failed"
-        return None
-
-    if (error := handshake()) is not None:
-        print(error)
-        return
-
     # Get the filesize of the file
     filesize = os.stat(filename).st_size
     # If open(filename, "type").read(bytesize) doesn't get the same number of bytes
@@ -30,8 +17,16 @@ def send_file(server: socket.socket, filename: str):
     size_a = filesize // 4096
     size_r = filesize % 4096
 
+    name_from_path = ""
+    for i in range(len(filename)-1, -1, -1):
+        if filename[i] == "\\":
+            break
+        else:
+            name_from_path += filename[i]
+    name_from_path = name_from_path[::-1]
+
     # Save the filename, file size, number of 4096 bytes, and remainder
-    format_filename = f"{copy.copy(filename)}|{filesize}|{size_a}|{size_r}"
+    format_filename = f"{name_from_path}|{filesize}|{size_a}|{size_r}"
     filename_size = sys.getsizeof(format_filename.encode())
     # After sending acknowledgement, server expects a byte size of 4096 bytes
     # Make the filename 4096 bytes
@@ -40,9 +35,6 @@ def send_file(server: socket.socket, filename: str):
             format_filename += " "
     # Send the filename, file size, number of 4096 bytes, and remainder to the server
     server.send(format_filename.encode())
-
-    # Give the server some time to process
-    time.sleep(1)
 
     # Send the file
     with open(filename, "rb") as f:
@@ -73,6 +65,7 @@ def main():
     def on_created(event):
         print(f"New file {event.src_path}")
         send_file(s, event.src_path)
+        print("file_sent")
     def on_deleted(event):
         print(f'File {event.src_path} deleted')
 
