@@ -7,20 +7,7 @@ from watchdog.events import PatternMatchingEventHandler
 import time
 
 
-def send_file(filename, server):
-    def handshake():
-        # Notify the server that a file is sending
-        server.send("Sending File...".encode())
-        # Receive Server Acknowledgment
-        if not server.recv(48).decode() == "Receiving File.":
-            print("Server Acknowledgement Failed")
-            return "Server Acknowledgment Failed"
-        return None
-
-    if (error := handshake()) is not None:
-        print(error)
-        return
-
+def send_file(server: socket.socket, filename: str):
     # Get the filesize of the file
     filesize = os.stat(filename).st_size
     # If open(filename, "type").read(bytesize) doesn't get the same number of bytes
@@ -30,8 +17,16 @@ def send_file(filename, server):
     size_a = filesize // 4096
     size_r = filesize % 4096
 
+    name_from_path = ""
+    for i in range(len(filename)-1, -1, -1):
+        if filename[i] == "\\":
+            break
+        else:
+            name_from_path += filename[i]
+    name_from_path = name_from_path[::-1]
+
     # Save the filename, file size, number of 4096 bytes, and remainder
-    format_filename = f"{copy.copy(filename)}|{filesize}|{size_a}|{size_r}"
+    format_filename = f"{name_from_path}|{filesize}|{size_a}|{size_r}"
     filename_size = sys.getsizeof(format_filename.encode())
     # After sending acknowledgement, server expects a byte size of 4096 bytes
     # Make the filename 4096 bytes
@@ -40,9 +35,6 @@ def send_file(filename, server):
             format_filename += " "
     # Send the filename, file size, number of 4096 bytes, and remainder to the server
     server.send(format_filename.encode())
-
-    # Give the server some time to process
-    time.sleep(1)
 
     # Send the file
     with open(filename, "rb") as f:
@@ -57,23 +49,8 @@ def send_file(filename, server):
     print(server.recv(4096).decode().strip())
 
 
-def on_created(event):
-    pass
-
-
 def main():
-    # Watchdog initialization code
-    patterns = ["*"]
-    ignore_patterns = None
-    ignore_directories = None
-    case_sensitive = True
-    my_event_handler = PatternMatchingEventHandler(patterns, ignore_patterns, ignore_directories, case_sensitive)
-    my_event_handler.on_created = on_created
-    path = "Camera\\Images"
-    go_recursively = True
-    my_observer = Observer()
-    my_observer.schedule(my_event_handler, path, recursive=go_recursively)
-    print("im here")
+
 
     # define server location (localhost)
     host = "127.0.0.1"
@@ -83,6 +60,31 @@ def main():
 
     # connect to Server
     s.connect((host, port))
+
+    # Watchdog initialization code
+    def on_created(event):
+        print(f"New file {event.src_path}")
+        send_file(s, event.src_path)
+        print("file_sent")
+    def on_deleted(event):
+        print(f'File {event.src_path} deleted')
+
+    patterns = ["*"]
+    ignore_patterns = None
+    ignore_directories = None
+    case_sensitive = True
+    my_event_handler = PatternMatchingEventHandler(patterns, ignore_patterns, ignore_directories, case_sensitive)
+    my_event_handler.on_created = on_created
+    my_event_handler.on_deleted = on_deleted
+    path = os.getcwd() + "\\Camera\\Images"
+    print(path)
+    go_recursively = True
+    my_observer = Observer()
+    my_observer.schedule(my_event_handler, path, recursive=go_recursively)
+    my_observer.start()
+    print("im here")
+    while True:
+        pass
 
 
 
